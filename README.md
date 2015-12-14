@@ -1,3 +1,4 @@
+Use our code to save yourself time on cross-platform, cross-device and cross OS version development and testing
 # ios_module_CustomForm
 Custom Form widget is intended for construction and displaying of a form for filling information and sending it's result by eMail.
 
