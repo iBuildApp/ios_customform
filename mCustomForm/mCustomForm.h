@@ -20,9 +20,12 @@
                                                           UITextFieldDelegate,
                                                           UIPickerViewDelegate,
                                                           UIPickerViewDataSource,
+                                                          UIActionSheetDelegate,
                                                           UITableViewDelegate,
                                                           UITableViewDataSource,
-                                                          MFMailComposeViewControllerDelegate>
+                                                          MFMailComposeViewControllerDelegate,
+                                                          UIImagePickerControllerDelegate,
+                                                          UINavigationControllerDelegate>
 {
   NSMutableArray *elements;
   NSMutableArray *groups;
@@ -33,6 +36,37 @@
   NSMutableArray *ddArray;  //pickerviews array
   NSMutableArray *rbElements;//tmp array for RadioButton elements
   UITextView *Field;
+  NSMutableArray *images;
+  NSData *resultingImageData;
+  UIView *imgPanel;
+  UIImage *img1;
+  UIImage *img2;
+  UIImage *img3;
+  UIImage *img4;
+  UIImage *img5;
+  UIImage *img6;
+  UIImage *img7;
+  UIImage *img8;
+  UIImageView *imgView1;
+  UIImageView *imgView2;
+    UIImageView *imgView3;
+    UIImageView *imgView4;
+    UIImageView *imgView5;
+    UIImageView *imgView6;
+  UIImageView *imgView7;
+  UIImageView *imgView8;
+  UIImageView *imgView1X;
+  UIImageView *imgView2X;
+  UIImageView *imgView3X;
+  UIImageView *imgView4X;
+  UIImageView *imgView5X;
+  UIImageView *imgView6X;
+  UIImageView *imgView7X;
+  UIImageView *imgView8X;
+  
+  NSIndexPath *selectedRow;
+  NSArray *jpgArray;
+  int imgCount;
 }
 
 /**

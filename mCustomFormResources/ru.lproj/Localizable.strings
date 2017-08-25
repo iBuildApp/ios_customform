@@ -22,3 +22,6 @@
 
 "mCF_date_placeholder" = "ДД/ММ/ГГГГ";
 "mCF_date_format" = "dd/MM/yyyy";
+
+/* Add image button title */
+"mCF_addImageButton" = "Добавить фото";

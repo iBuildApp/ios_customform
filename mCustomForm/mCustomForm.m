@@ -19,6 +19,7 @@
 #import "TPKeyboardAvoidingTableView.h"
 #import "GCPlaceholderTextView.h"
 #import "TBXML.h"
+#import <MessageUI/MessageUI.h>
 
 #import "mCFCheckBox.h"
 
@@ -289,6 +290,7 @@
       NSArray *itemsNameFilter = [NSArray arrayWithObjects:@"entryfield",
                                   @"textarea",
                                   @"checkbox",
+                                  @"photopicker",
                                   @"radiobutton",
                                   @"dropdown",
                                   @"datepicker", nil];
@@ -446,8 +448,11 @@
           object = [[NSMutableDictionary alloc] init];
         }
         
-        if (labelText && ![type isEqualToString:@"radiobutton"])
-          [object setObject:labelText forKey:@"label"];
+        if (labelText && ![type isEqualToString:@"radiobutton"]){
+          if (labelText.length > 0) {
+            [object setObject:labelText forKey:@"label"];
+          }
+        }
         
         if ([type isEqualToString:@"textarea"])
         {
@@ -466,7 +471,7 @@
                                            limitSize:CGSizeMake(self.fieldWidth, 2000.0)
                                      nslineBreakMode:NSLineBreakByWordWrapping];
           
-          if (labelText)
+          if (labelText && labelText.length > 0)
           {
             CGSize labelsize=[labelText sizeForFont:[UIFont systemFontOfSize:17.0f]
                                           limitSize:CGSizeMake(self.fieldWidth, 2000.0)
@@ -498,7 +503,7 @@
             textView.attributedPlaceholder = str;
           }
           
-          if (labelText)
+          if (labelText && labelText.length > 0)
           {
             CGSize labelsize=[labelText sizeForFont:[UIFont systemFontOfSize:17.0f]
                                           limitSize:CGSizeMake(self.fieldWidth, 2000.0)
@@ -532,7 +537,6 @@
             }
             else
             {
-              //datePicker.date = [NSDate date];
               [value replaceObjectAtIndex:0
                                withObject:NSBundleLocalizedString(@"mCF_date_placeholder", @"MM/DD/YYYY")];
             }
@@ -576,13 +580,46 @@
           [object setObject:@"checkbox" forKey:@"type"];
           [object setObject:checkbox forKey:@"object"];
         }
+        else if([type isEqualToString:@"photopicker"]){
+          UIButton *btnPhotoPicker = [UIButton buttonWithType:UIButtonTypeCustom];
+          NSString *photoPickerTitle = NSBundleLocalizedString(@"mCF_addImageButton", @"Add image button title");
+          btnPhotoPicker.titleLabel.font = [UIFont systemFontOfSize:18.0f];
+          [btnPhotoPicker setTitle:photoPickerTitle forState:UIControlStateNormal];
+          btnPhotoPicker.frame = CGRectMake(10, 0.0f, photoPickerTitle.length * 10 + 30, kTextFieldHeight - 6);
+          btnPhotoPicker.layer.masksToBounds = YES;
+          btnPhotoPicker.backgroundColor = self.color5spec;
+          [btnPhotoPicker addTarget:self action:@selector(pickPhoto) forControlEvents:UIControlEventTouchUpInside];
+          [btnPhotoPicker setContentHorizontalAlignment: UIControlContentHorizontalAlignmentCenter];
+          [btnPhotoPicker setTitleColor:self.mCFColorOfBackground forState:UIControlStateNormal];
+          btnPhotoPicker.hidden = NO;
+          
+          object = [[NSMutableDictionary alloc] init];
+          
+          [object setObject:btnPhotoPicker forKey:@"object"];
+          [object setObject:@"btnPicker" forKey:@"type"];
+          
+          
+          [groupElements addObject:object];
+          
+          CGRect frame = CGRectMake(10, 0, self.fieldWidth, 1);
+          imgPanel = [[UIView alloc] initWithFrame:frame];
+          [imgPanel setBackgroundColor:[UIColor clearColor]];
+          
+          object = [[NSMutableDictionary alloc] init];
+          
+          [object setObject:imgPanel forKey:@"object"];
+          [object setObject:@"imgPanel" forKey:@"type"];
+          
+          
+          [groupElements addObject:object];
+        }
         else if ([type isEqualToString:@"radiobutton"])
         {
           if (!rbElements) rbElements = [[NSMutableArray alloc] init];
           
           rbCount++;
           
-          if (labelText)
+          if (labelText && labelText > 0)
             [rbElements addObject:labelText];
           else
             [rbElements addObject:@""];
@@ -598,11 +635,10 @@
         }
         i++;
         
-        if ([object count]>0)
+        if ([object count]>0 && ![type isEqualToString:@"photopicker"])
           [groupElements addObject:object];
       }
     }
-    
     [groups addObject:groupElements];
   }
   
@@ -613,9 +649,7 @@
 
   UIButton *btnSend = [UIButton buttonWithType:UIButtonTypeCustom];
   btnSend.titleLabel.font = [UIFont systemFontOfSize:22.0f];
-  //CGSize btnSize = [sendTitle ? sendTitle:NSBundleLocalizedString(@"mCF_sendButton", @"Send") sizeWithFont:btnSend.titleLabel.font];
-  //float btnWidth = MAX(160, btnSize.width + 10);
-  btnSend.frame = CGRectMake(10, 0.0f, self.fieldWidth, kTextFieldHeight);
+  btnSend.frame = CGRectMake(10, -5.0f, self.fieldWidth, kTextFieldHeight);
   btnSend.layer.masksToBounds = YES;
   btnSend.backgroundColor = self.color5spec;
   [btnSend addTarget:self action:@selector(sendEmail) forControlEvents:UIControlEventTouchUpInside];
@@ -629,9 +663,7 @@
   [object setObject:@"btnSend" forKey:@"type"];
   
   [groupElements addObject:object];
-  
   [groups addObject:groupElements];
-  
   [groupTitles addObject:@""];
 }
 
@@ -649,8 +681,6 @@
   [rbElements removeAllObjects];
 }
 
-
-
 #pragma mark - View lifecycle
 
 - (void)viewDidLoad
@@ -658,7 +688,7 @@
   [super viewDidLoad];
   [self.navigationController setNavigationBarHidden:NO animated:YES];
   [self.navigationItem setHidesBackButton:NO animated:YES];
-  [[self.tabBarController tabBar] setHidden:NO];
+  [[self.tabBarController tabBar] setHidden:YES];
   
   self.tableView = [[TPKeyboardAvoidingTableView alloc] initWithFrame:self.view.bounds
                                                                  style:UITableViewStyleGrouped];
@@ -669,24 +699,20 @@
   self.tableView.dataSource = self;
   self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
   self.tableView.separatorColor = [UIColor clearColor];
-#ifdef __IPHONE_7_0
-  
+if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"7.0")) {
   if ([self.tableView respondsToSelector:@selector(setSeparatorInset:)])
     [self.tableView setSeparatorInset:UIEdgeInsetsZero];
   
   if ([self.tableView respondsToSelector:@selector(setLayoutMargins:)])
     [self.tableView setLayoutMargins:UIEdgeInsetsZero];
-  
-#endif
+}
   self.tableView.contentMode = UIViewContentModeScaleToFill;
   self.tableView.autoresizesSubviews = YES;
-  
+  imgCount = 0;
     // on iOS7 grouped cells have drawn the entire width of the screen, so we change width of text fields:
   
-#ifdef __IPHONE_7_0
   if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"7.0"))
     self.fieldWidth = 300;
-#endif
   
   UIImageView *bgView = [[UIImageView alloc] initWithFrame:self.tableView.frame];
   bgView.backgroundColor = self.mCFColorOfBackground;
@@ -763,7 +789,7 @@
     
     CGSize labelsize = CGSizeMake(0, 0);
     
-    if (labelText&&![type isEqualToString:@"radiobutton"])
+    if (labelText && labelText.length > 0 &&![type isEqualToString:@"radiobutton"])
     {
       TExtendedLabel *label = nil;
       
@@ -906,8 +932,18 @@
     MIRadioButtonGroup *radioButtons = object;
     return radioButtons.frame.size.height;
   }
+  else if ([object isKindOfClass:[UIButton class]])
+  {
+    return 50;
+  }
+  else if ([object isKindOfClass:[UIView class]])
+  {
+    selectedRow = indexPath;
+    imgPanel.hidden = NO;
+    return 5 + imgPanel.frame.size.height;
+  }
   else
-    return 60;
+    return 20;
 }
 
 
@@ -936,10 +972,8 @@
   
   pickerBackground.backgroundColor = [UIColor clearColor];
   
-#ifdef __IPHONE_7_0
   if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"7.0"))
     pickerBackground.backgroundColor = [UIColor whiteColor];
-#endif
   
   [view addSubview:pickerBackground];
   
@@ -1177,6 +1211,753 @@
   [[self.view viewWithTag:2] removeFromSuperview];
 }
 
+- (void)pickPhoto
+{
+  [self.view endEditing:YES];
+  if (imgCount > 7) {
+    UIAlertView *alert = [[UIAlertView alloc] initWithTitle:nil
+                                                    message:@"Reached the limit of photos"
+                                                   delegate:self
+                                          cancelButtonTitle:@"OK"
+                                          otherButtonTitles:nil];
+    [alert show];
+    return;
+  }
+  NSString *other1 = @"Take a picture";
+  NSString *other2 = @"Choose from album";
+  NSString *cancelTitle = @"Cancel";
+  UIActionSheet *actionSheet = [[UIActionSheet alloc]
+                                initWithTitle:nil
+                                delegate:self
+                                cancelButtonTitle:cancelTitle
+                                destructiveButtonTitle:nil
+                                otherButtonTitles:other1, other2, nil];
+  [actionSheet showInView:self.view];
+}
+
+
+- (IBAction)pickPhoto1 {
+  UIActionSheet *action = [[UIActionSheet alloc] initWithTitle:@"Select image from" delegate:self cancelButtonTitle:@"Cancel" destructiveButtonTitle:nil otherButtonTitles:@"From library",@"From camera", nil];
+  
+  [action showInView:self.view];
+}
+
+#pragma mark - ActionSheet delegates
+
+- (void)actionSheet:(UIActionSheet *)actionSheet clickedButtonAtIndex:(NSInteger)buttonIndex
+{
+  if( buttonIndex == 0 ) {
+    
+    if ([UIImagePickerController isSourceTypeAvailable:UIImagePickerControllerSourceTypeCamera]) {
+      UIImagePickerController *pickerView =[[UIImagePickerController alloc]init];
+      pickerView.allowsEditing = NO;
+      //pickerView.wantsFullScreenLayout = YES;
+        pickerView.extendedLayoutIncludesOpaqueBars = YES;
+        pickerView.edgesForExtendedLayout = YES;
+      pickerView.delegate = self;
+      pickerView.sourceType = UIImagePickerControllerSourceTypeCamera;
+
+      [self presentViewController:pickerView animated:true completion:nil];
+    }
+    
+  }else if( buttonIndex == 1 ) {
+    
+    UIImagePickerController *pickerView = [[UIImagePickerController alloc] init];
+    pickerView.allowsEditing = NO;
+      //pickerView.wantsFullScreenLayout = YES;
+      pickerView.extendedLayoutIncludesOpaqueBars = YES;
+      pickerView.edgesForExtendedLayout = YES;
+
+    pickerView.delegate = self;
+    [pickerView setSourceType:UIImagePickerControllerSourceTypePhotoLibrary];
+    [self presentViewController:pickerView animated:YES completion:nil];
+    
+  }
+}
+
+#pragma mark - PickerDelegates
+
+- (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary *)info{
+  
+  [self dismissViewControllerAnimated:true completion:nil];
+  if (imgCount == 0) {
+    
+    imgCount+=1;
+    
+    UIImage * img = [info valueForKey:UIImagePickerControllerOriginalImage];
+    img1 = img;
+    [images addObject:img];
+    resultingImageData = UIImageJPEGRepresentation(img, 0.9);
+    CGRect frame = CGRectMake(0, 10, 60, 60); // Replacing with your dimensions
+    imgView1 = [[UIImageView alloc] initWithFrame:frame];
+    [imgView1 setImage:img];
+    imgView1.layer.borderColor = [UIColor whiteColor].CGColor;
+    imgView1.layer.borderWidth = 1;
+    
+    UITapGestureRecognizer *singleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetected)];
+    singleTap.numberOfTapsRequired = 1;
+    [imgView1 setUserInteractionEnabled:YES];
+    [imgView1 addGestureRecognizer:singleTap];
+    
+    
+    CGRect frameX = CGRectMake(47, 0, 24, 24); // Replacing with your dimensions
+    imgView1X = [[UIImageView alloc] initWithFrame:frameX];
+    [imgView1X setImage:[UIImage imageNamed:resourceFromBundle(@"mCF_delete.png")]];
+                                                                                    
+    UITapGestureRecognizer *singleTapX = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetectedX)];
+    singleTapX.numberOfTapsRequired = 1;
+    [imgView1X setUserInteractionEnabled:YES];
+    [imgView1X addGestureRecognizer:singleTapX];
+    
+    imgView1.hidden = NO;
+    imgView1X.hidden = NO;
+    
+    imgPanel.frame = CGRectMake(imgPanel.frame.origin.x, imgPanel.frame.origin.y, imgPanel.frame.size.width, imgPanel.frame.size.height + 80);
+    [imgPanel addSubview:imgView1];
+    [imgPanel addSubview:imgView1X];
+    
+    imgPanel.hidden = NO;
+    [self.tableView reloadData];
+  } else if(imgCount == 1){
+    
+    imgCount +=1;
+    UIImage * img = [info valueForKey:UIImagePickerControllerOriginalImage];
+    img2 = img;
+    [images addObject:img];
+    resultingImageData = UIImageJPEGRepresentation(img2, 0.9);
+    CGRect frame2 = CGRectMake(78, 10, 60, 60); // Replacing with your dimensions
+    imgView2 = [[UIImageView alloc] initWithFrame:frame2];
+    [imgView2 setImage:img2];
+    imgView2.layer.borderColor = [UIColor whiteColor].CGColor;
+    imgView2.layer.borderWidth = 1;
+    
+    UITapGestureRecognizer *singleTap2 = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetected2)];
+    singleTap2.numberOfTapsRequired = 1;
+    [imgView2 setUserInteractionEnabled:YES];
+    [imgView2 addGestureRecognizer:singleTap2];
+    
+    
+    CGRect frameX2 = CGRectMake(125, 0, 24, 24); // Replacing with your dimensions
+    imgView2X = [[UIImageView alloc] initWithFrame:frameX2];
+    [imgView2X setImage:[UIImage imageNamed:resourceFromBundle(@"mCF_delete.png")]];
+    UITapGestureRecognizer *singleTapX2 = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetectedX2)];
+    singleTapX2.numberOfTapsRequired = 1;
+    [imgView2X setUserInteractionEnabled:YES];
+    [imgView2X addGestureRecognizer:singleTapX2];
+    
+    imgView2.hidden = NO;
+    imgView2X.hidden = NO;
+    
+    [imgPanel addSubview:imgView2];
+    [imgPanel addSubview:imgView2X];
+    
+    
+  } else if(imgCount == 2){
+    
+    imgCount +=1;
+    UIImage * img = [info valueForKey:UIImagePickerControllerOriginalImage];
+    img3 = img;
+    [images addObject:img];
+    resultingImageData = UIImageJPEGRepresentation(img3, 0.9);
+    CGRect frame3 = CGRectMake(158, 10, 60, 60); // Replacing with your dimensions
+    imgView3 = [[UIImageView alloc] initWithFrame:frame3];
+    [imgView3 setImage:img3];
+    imgView3.layer.borderColor = [UIColor whiteColor].CGColor;
+    imgView3.layer.borderWidth = 1;
+    
+    UITapGestureRecognizer *singleTap3 = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetected3)];
+    singleTap3.numberOfTapsRequired = 1;
+    [imgView3 setUserInteractionEnabled:YES];
+    [imgView3 addGestureRecognizer:singleTap3];
+    
+    
+    CGRect frameX3 = CGRectMake(205, 0, 24, 24); // Replacing with your dimensions
+    imgView3X = [[UIImageView alloc] initWithFrame:frameX3];
+    [imgView3X setImage:[UIImage imageNamed:resourceFromBundle(@"mCF_delete.png")]];
+    UITapGestureRecognizer *singleTapX3 = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetectedX3)];
+    singleTapX3.numberOfTapsRequired = 1;
+    [imgView3X setUserInteractionEnabled:YES];
+    [imgView3X addGestureRecognizer:singleTapX3];
+    
+    imgView3.hidden = NO;
+    imgView3X.hidden = NO;
+    
+    [imgPanel addSubview:imgView3];
+    [imgPanel addSubview:imgView3X];
+  } else if(imgCount == 3){
+    
+    imgCount +=1;
+    UIImage * img = [info valueForKey:UIImagePickerControllerOriginalImage];
+    img4 = img;
+    [images addObject:img];
+    resultingImageData = UIImageJPEGRepresentation(img4, 0.9);
+    CGRect frame4 = CGRectMake(238, 10, 60, 60); // Replacing with your dimensions
+    imgView4 = [[UIImageView alloc] initWithFrame:frame4];
+    [imgView4 setImage:img4];
+    imgView4.layer.borderColor = [UIColor whiteColor].CGColor;
+    imgView4.layer.borderWidth = 1;
+    
+    UITapGestureRecognizer *singleTap4 = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetected4)];
+    singleTap4.numberOfTapsRequired = 1;
+    [imgView4 setUserInteractionEnabled:YES];
+    [imgView4 addGestureRecognizer:singleTap4];
+    
+    
+    CGRect frameX4 = CGRectMake(285, 0, 24, 24); // Replacing with your dimensions
+    imgView4X = [[UIImageView alloc] initWithFrame:frameX4];
+    [imgView4X setImage:[UIImage imageNamed:resourceFromBundle(@"mCF_delete.png")]];
+    UITapGestureRecognizer *singleTapX4 = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetectedX4)];
+    singleTapX4.numberOfTapsRequired = 1;
+    [imgView4X setUserInteractionEnabled:YES];
+    [imgView4X addGestureRecognizer:singleTapX4];
+    
+    imgView4.hidden = NO;
+    imgView4X.hidden = NO;
+    
+    [imgPanel addSubview:imgView4];
+    [imgPanel addSubview:imgView4X];
+  } else if (imgCount == 4) {
+    
+    imgCount+=1;
+    
+    UIImage * img = [info valueForKey:UIImagePickerControllerOriginalImage];
+    img5 = img;
+    [images addObject:img];
+    resultingImageData = UIImageJPEGRepresentation(img5, 0.9);
+    CGRect frame5 = CGRectMake(0, 95, 60, 60); // Replacing with your dimensions
+    imgView5 = [[UIImageView alloc] initWithFrame:frame5];
+    [imgView5 setImage:img];
+    imgView5.layer.borderColor = [UIColor whiteColor].CGColor;
+    imgView5.layer.borderWidth = 1;
+    
+    UITapGestureRecognizer *singleTap5 = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetected5)];
+    singleTap5.numberOfTapsRequired = 1;
+    [imgView5 setUserInteractionEnabled:YES];
+    [imgView5 addGestureRecognizer:singleTap5];
+    
+    
+    CGRect frameX5 = CGRectMake(47, 85, 24, 24); // Replacing with your dimensions
+    imgView5X = [[UIImageView alloc] initWithFrame:frameX5];
+    [imgView5X setImage:[UIImage imageNamed:resourceFromBundle(@"mCF_delete.png")]];
+    UITapGestureRecognizer *singleTapX5 = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetectedX5)];
+    singleTapX5.numberOfTapsRequired = 1;
+    [imgView5X setUserInteractionEnabled:YES];
+    [imgView5X addGestureRecognizer:singleTapX5];
+    
+    imgView5.hidden = NO;
+    imgView5X.hidden = NO;
+    
+    imgPanel.frame = CGRectMake(imgPanel.frame.origin.x, imgPanel.frame.origin.y, imgPanel.frame.size.width, imgPanel.frame.size.height + 80);
+    imgPanel.hidden = NO;
+    [imgPanel addSubview:imgView5];
+    [imgPanel addSubview:imgView5X];
+    
+    [self.tableView reloadData];
+  } else if(imgCount == 5){
+    
+    imgCount +=1;
+    UIImage * img = [info valueForKey:UIImagePickerControllerOriginalImage];
+    img6 = img;
+    [images addObject:img];
+    resultingImageData = UIImageJPEGRepresentation(img6, 0.9);
+    CGRect frame6 = CGRectMake(78, 95, 60, 60); // Replacing with your dimensions
+    imgView6 = [[UIImageView alloc] initWithFrame:frame6];
+    [imgView6 setImage:img6];
+    imgView6.layer.borderColor = [UIColor whiteColor].CGColor;
+    imgView6.layer.borderWidth = 1;
+    
+    UITapGestureRecognizer *singleTap6 = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetected6)];
+    singleTap6.numberOfTapsRequired = 1;
+    [imgView6 setUserInteractionEnabled:YES];
+    [imgView6 addGestureRecognizer:singleTap6];
+    
+    
+    CGRect frameX6 = CGRectMake(125, 85, 24, 24); // Replacing with your dimensions
+    imgView6X = [[UIImageView alloc] initWithFrame:frameX6];
+    [imgView6X setImage:[UIImage imageNamed:resourceFromBundle(@"mCF_delete.png")]];
+    UITapGestureRecognizer *singleTapX6 = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetectedX6)];
+    singleTapX6.numberOfTapsRequired = 1;
+    [imgView6X setUserInteractionEnabled:YES];
+    [imgView6X addGestureRecognizer:singleTapX6];
+    
+    imgView6.hidden = NO;
+    imgView6X.hidden = NO;
+    
+    [imgPanel addSubview:imgView6];
+    [imgPanel addSubview:imgView6X];
+    
+    
+  } else if(imgCount == 6){
+    
+    imgCount +=1;
+    UIImage * img = [info valueForKey:UIImagePickerControllerOriginalImage];
+    img7 = img;
+    [images addObject:img];
+    resultingImageData = UIImageJPEGRepresentation(img7, 0.9);
+    CGRect frame7 = CGRectMake(158, 95, 60, 60); // Replacing with your dimensions
+    imgView7 = [[UIImageView alloc] initWithFrame:frame7];
+    [imgView7 setImage:img7];
+    imgView7.layer.borderColor = [UIColor whiteColor].CGColor;
+    imgView7.layer.borderWidth = 1;
+    
+    UITapGestureRecognizer *singleTap7 = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetected7)];
+    singleTap7.numberOfTapsRequired = 1;
+    [imgView7 setUserInteractionEnabled:YES];
+    [imgView7 addGestureRecognizer:singleTap7];
+    
+    
+    CGRect frameX7 = CGRectMake(205, 85, 24, 24); // Replacing with your dimensions
+    imgView7X = [[UIImageView alloc] initWithFrame:frameX7];
+    [imgView7X setImage:[UIImage imageNamed:resourceFromBundle(@"mCF_delete.png")]];
+    UITapGestureRecognizer *singleTapX7 = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetectedX7)];
+    singleTapX7.numberOfTapsRequired = 1;
+    [imgView7X setUserInteractionEnabled:YES];
+    [imgView7X addGestureRecognizer:singleTapX7];
+    
+    imgView7.hidden = NO;
+    imgView7X.hidden = NO;
+    
+    [imgPanel addSubview:imgView7];
+    [imgPanel addSubview:imgView7X];
+  } else if(imgCount == 7){
+    
+    imgCount +=1;
+    UIImage * img = [info valueForKey:UIImagePickerControllerOriginalImage];
+    img8 = img;
+    [images addObject:img];
+    resultingImageData = UIImageJPEGRepresentation(img8, 0.9);
+    CGRect frame8 = CGRectMake(238, 95, 60, 60); // Replacing with your dimensions
+    imgView8 = [[UIImageView alloc] initWithFrame:frame8];
+    [imgView8 setImage:img8];
+    imgView8.layer.borderColor = [UIColor whiteColor].CGColor;
+    imgView8.layer.borderWidth = 1;
+    
+    UITapGestureRecognizer *singleTap8 = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetected8)];
+    singleTap8.numberOfTapsRequired = 1;
+    [imgView8 setUserInteractionEnabled:YES];
+    [imgView8 addGestureRecognizer:singleTap8];
+    
+    
+    CGRect frameX8 = CGRectMake(285, 85, 24, 24); // Replacing with your dimensions
+    imgView8X = [[UIImageView alloc] initWithFrame:frameX8];
+    [imgView8X setImage:[UIImage imageNamed:resourceFromBundle(@"mCF_delete.png")]];
+    UITapGestureRecognizer *singleTapX8 = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetectedX8)];
+    singleTapX8.numberOfTapsRequired = 1;
+    [imgView8X setUserInteractionEnabled:YES];
+    [imgView8X addGestureRecognizer:singleTapX8];
+    
+    imgView4.hidden = NO;
+    imgView4X.hidden = NO;
+    
+    [imgPanel addSubview:imgView8];
+    [imgPanel addSubview:imgView8X];
+  }
+  imgPanel.hidden = NO;
+}
+
+-(void)tapDetected{
+  [self pickPhoto2];
+}
+
+-(void)tapDetectedX{
+  if (imgView2.image && imgView2.hidden == NO) {
+    [imgView1 setImage:imgView2.image];
+  } else {
+    imgView1.hidden = YES;
+    imgView1X.hidden = YES;
+    img1 = nil;
+  }
+  
+  if (imgView3.image && imgView3.hidden == NO) {
+    [imgView2 setImage:imgView3.image];
+  } else {
+    imgView2.hidden = YES;
+    imgView2X.hidden = YES;
+  }
+  
+  if (imgView4.image && imgView4.hidden == NO) {
+    [imgView3 setImage:imgView4.image];
+  } else {
+    imgView3.hidden = YES;
+    imgView3X.hidden = YES;
+  }
+  
+  if (imgView5.image && imgView5.hidden == NO) {
+    [imgView4 setImage:imgView5.image];
+  } else {
+    imgView4.hidden = YES;
+    imgView4X.hidden = YES;
+  }
+  
+  if (imgView6.image && imgView6.hidden == NO) {
+    [imgView5 setImage:imgView6.image];
+  } else {
+    imgView5.hidden = YES;
+    imgView5X.hidden = YES;
+    imgPanel.frame = CGRectMake(imgPanel.frame.origin.x, imgPanel.frame.origin.y, imgPanel.frame.size.width, 80);
+    [self.tableView reloadData];
+  }
+  
+  if (imgView7.image && imgView7.hidden == NO) {
+    [imgView6 setImage:imgView7.image];
+  } else {
+    imgView6.hidden = YES;
+    imgView6X.hidden = YES;
+  }
+  
+  if (imgView8.image && imgView8.hidden == NO) {
+    [imgView7 setImage:imgView8.image];
+    imgView8.hidden = YES;
+    imgView8X.hidden = YES;
+  } else {
+    imgView7.hidden = YES;
+    imgView7X.hidden = YES;
+  }
+  
+  imgCount -=1;
+
+  if (imgCount == 0) {
+    imgPanel.frame = CGRectMake(imgPanel.frame.origin.x, imgPanel.frame.origin.y, imgPanel.frame.size.width, 0);
+  }
+}
+
+-(void)img2mv{
+  [imgView2 setImage:imgView3.image];
+  [imgView2 setFrame:imgView3.frame];
+  imgView2.hidden = NO;
+  imgView3.hidden = YES;
+}
+
+-(void)tapDetected2{
+  [self pickPhoto22];
+}
+
+-(void)tapDetectedX2{
+  imgCount-=1;
+  
+    //second
+  if (imgView3.image && imgView3.hidden == NO) {
+    [imgView2 setImage:imgView3.image];
+  } else {
+    imgView2.hidden = YES;
+    imgView2X.hidden = YES;
+  }
+  
+  if (imgView4.image && imgView4.hidden == NO) {
+    [imgView3 setImage:imgView4.image];
+  } else {
+    imgView3.hidden = YES;
+    imgView3X.hidden = YES;
+  }
+  
+  if (imgView5.image && imgView5.hidden == NO) {
+    [imgView4 setImage:imgView5.image];
+  } else {
+    imgView4.hidden = YES;
+    imgView4X.hidden = YES;
+  }
+  
+  if (imgView6.image && imgView6.hidden == NO) {
+    [imgView5 setImage:imgView6.image];
+  } else {
+    imgView5.hidden = YES;
+    imgView5X.hidden = YES;
+    imgPanel.frame = CGRectMake(imgPanel.frame.origin.x, imgPanel.frame.origin.y, imgPanel.frame.size.width, 80);
+    [self.tableView reloadData];
+  }
+  
+  if (imgView7.image && imgView7.hidden == NO) {
+    [imgView6 setImage:imgView7.image];
+  } else {
+    imgView6.hidden = YES;
+    imgView6X.hidden = YES;
+  }
+  
+  if (imgView8.image && imgView8.hidden == NO) {
+    [imgView7 setImage:imgView8.image];
+    imgView8.hidden = YES;
+    imgView8X.hidden = YES;
+  } else {
+    imgView7.hidden = YES;
+    imgView7X.hidden = YES;
+  }
+}
+
+-(void)tapDetected3{
+  [self pickPhoto23];
+}
+
+-(void)tapDetectedX3{
+  if (imgView4.image && imgView4.hidden == NO) {
+    [imgView3 setImage:imgView4.image];
+  } else {
+    imgView3.hidden = YES;
+    imgView3X.hidden = YES;
+  }
+  
+  if (imgView5.image && imgView5.hidden == NO) {
+    [imgView4 setImage:imgView5.image];
+  } else {
+    imgView4.hidden = YES;
+    imgView4X.hidden = YES;
+  }
+  
+  if (imgView6.image && imgView6.hidden == NO) {
+    [imgView5 setImage:imgView6.image];
+  } else {
+    imgView5.hidden = YES;
+    imgView5X.hidden = YES;
+    imgPanel.frame = CGRectMake(imgPanel.frame.origin.x, imgPanel.frame.origin.y, imgPanel.frame.size.width, 80);
+    [self.tableView reloadData];
+  }
+  
+  if (imgView7.image && imgView7.hidden == NO) {
+    [imgView6 setImage:imgView7.image];
+  } else {
+    imgView6.hidden = YES;
+    imgView6X.hidden = YES;
+  }
+  
+  if (imgView8.image && imgView8.hidden == NO) {
+    [imgView7 setImage:imgView8.image];
+    imgView8.hidden = YES;
+    imgView8X.hidden = YES;
+  } else {
+    imgView7.hidden = YES;
+    imgView7X.hidden = YES;
+  }
+  
+  imgCount-=1;
+}
+
+-(void)tapDetected4{
+  [self pickPhoto24];
+}
+
+-(void)tapDetectedX4{
+  if (imgView5.image && imgView5.hidden == NO) {
+    [imgView4 setImage:imgView5.image];
+  } else {
+    imgView4.hidden = YES;
+    imgView4X.hidden = YES;
+  }
+  
+  if (imgView6.image && imgView6.hidden == NO) {
+    [imgView5 setImage:imgView6.image];
+  } else {
+    imgView5.hidden = YES;
+    imgView5X.hidden = YES;
+    imgPanel.frame = CGRectMake(imgPanel.frame.origin.x, imgPanel.frame.origin.y, imgPanel.frame.size.width, 80);
+    [self.tableView reloadData];
+  }
+  
+  if (imgView7.image && imgView7.hidden == NO) {
+    [imgView6 setImage:imgView7.image];
+  } else {
+    imgView6.hidden = YES;
+    imgView6X.hidden = YES;
+  }
+  
+  if (imgView8.image && imgView8.hidden == NO) {
+    [imgView7 setImage:imgView8.image];
+    imgView8.hidden = YES;
+    imgView8X.hidden = YES;
+  } else {
+    imgView7.hidden = YES;
+    imgView7X.hidden = YES;
+  }
+  
+  imgCount-=1;
+}
+
+-(void)tapDetected5{
+  [self pickPhoto25];
+}
+
+-(void)tapDetected6{
+  [self pickPhoto26];
+}
+
+-(void)tapDetected7{
+  [self pickPhoto27];
+}
+
+-(void)tapDetected8{
+  [self pickPhoto28];
+}
+
+-(void)tapDetectedX5{
+  if (imgView6.image && imgView6.hidden == NO) {
+    [imgView5 setImage:imgView6.image];
+  } else {
+    imgView5.hidden = YES;
+    imgView5X.hidden = YES;
+    imgPanel.frame = CGRectMake(imgPanel.frame.origin.x, imgPanel.frame.origin.y, imgPanel.frame.size.width, 80);
+    [self.tableView reloadData];
+  }
+  
+  if (imgView7.image && imgView7.hidden == NO) {
+    [imgView6 setImage:imgView7.image];
+  } else {
+    imgView6.hidden = YES;
+    imgView6X.hidden = YES;
+  }
+  
+  if (imgView8.image && imgView8.hidden == NO) {
+    [imgView7 setImage:imgView8.image];
+    imgView8.hidden = YES;
+    imgView8X.hidden = YES;
+  } else {
+    imgView7.hidden = YES;
+    imgView7X.hidden = YES;
+  }
+  
+  imgCount-=1;
+}
+
+-(void)tapDetectedX6{
+  if (imgView7.image && imgView7.hidden == NO) {
+    [imgView6 setImage:imgView7.image];
+  } else {
+    imgView6.hidden = YES;
+    imgView6X.hidden = YES;
+  }
+  
+  if (imgView8.image && imgView8.hidden == NO) {
+    [imgView7 setImage:imgView8.image];
+    imgView8.hidden = YES;
+    imgView8X.hidden = YES;
+  } else {
+    imgView7.hidden = YES;
+    imgView7X.hidden = YES;
+  }
+  
+  imgCount-=1;
+}
+
+-(void)tapDetectedX7{
+  if (imgView8.image && imgView8.hidden == NO) {
+    [imgView7 setImage:imgView8.image];
+    imgView8.hidden = YES;
+    imgView8X.hidden = YES;
+  } else {
+    imgView7.hidden = YES;
+    imgView7X.hidden = YES;
+  }
+  
+  imgCount-=1;
+}
+
+-(void)tapDetectedX8{
+    imgView8.hidden = YES;
+    imgView8X.hidden = YES;
+  imgCount-=1;
+}
+
+- (void)pickPhoto2
+{
+  UIViewController *controller = [[UIViewController alloc] init];
+  UIImage *img = imgView1.image;
+  UIImageView *view = [[UIImageView alloc] initWithImage:img];
+  view.contentMode = UIViewContentModeScaleAspectFit;
+  view.clipsToBounds = YES;
+  [view setBackgroundColor:[UIColor blackColor]];
+  controller.view = view;
+  
+  [self.navigationController pushViewController:controller animated:YES];
+}
+
+- (void)pickPhoto22
+{
+  UIViewController *controller = [[UIViewController alloc] init];
+  UIImage *img = imgView2.image;
+  UIImageView *view = [[UIImageView alloc] initWithImage:img];
+  view.contentMode = UIViewContentModeScaleAspectFit;
+  view.clipsToBounds = YES;
+  [view setBackgroundColor:[UIColor blackColor]];
+  controller.view = view;
+  
+  [self.navigationController pushViewController:controller animated:YES];
+}
+
+- (void)pickPhoto23
+{
+  UIViewController *controller = [[UIViewController alloc] init];
+  UIImage *img = imgView3.image;
+  UIImageView *view = [[UIImageView alloc] initWithImage:img];
+  view.contentMode = UIViewContentModeScaleAspectFit;
+  view.clipsToBounds = YES;
+  [view setBackgroundColor:[UIColor blackColor]];
+  controller.view = view;
+  
+  [self.navigationController pushViewController:controller animated:YES];
+}
+
+- (void)pickPhoto24
+{
+  UIViewController *controller = [[UIViewController alloc] init];
+  UIImage *img = imgView4.image;
+  UIImageView *view = [[UIImageView alloc] initWithImage:img];
+  view.contentMode = UIViewContentModeScaleAspectFit;
+  view.clipsToBounds = YES;
+  [view setBackgroundColor:[UIColor blackColor]];
+  controller.view = view;
+  
+  [self.navigationController pushViewController:controller animated:YES];
+}
+
+- (void)pickPhoto25
+{
+  UIViewController *controller = [[UIViewController alloc] init];
+  UIImage *img = imgView5.image;
+  UIImageView *view = [[UIImageView alloc] initWithImage:img];
+  view.contentMode = UIViewContentModeScaleAspectFit;
+  view.clipsToBounds = YES;
+  [view setBackgroundColor:[UIColor blackColor]];
+  controller.view = view;
+  
+  [self.navigationController pushViewController:controller animated:YES];
+}
+
+- (void)pickPhoto26
+{
+  UIViewController *controller = [[UIViewController alloc] init];
+  UIImage *img = imgView6.image;
+  UIImageView *view = [[UIImageView alloc] initWithImage:img];
+  view.contentMode = UIViewContentModeScaleAspectFit;
+  view.clipsToBounds = YES;
+  [view setBackgroundColor:[UIColor blackColor]];
+  controller.view = view;
+  
+  [self.navigationController pushViewController:controller animated:YES];
+}
+
+- (void)pickPhoto27
+{
+  UIViewController *controller = [[UIViewController alloc] init];
+  UIImage *img = imgView7.image;
+  UIImageView *view = [[UIImageView alloc] initWithImage:img];
+  view.contentMode = UIViewContentModeScaleAspectFit;
+  view.clipsToBounds = YES;
+  [view setBackgroundColor:[UIColor blackColor]];
+  controller.view = view;
+  
+  [self.navigationController pushViewController:controller animated:YES];
+}
+
+- (void)pickPhoto28
+{
+  UIViewController *controller = [[UIViewController alloc] init];
+  UIImage *img = imgView8.image;
+  UIImageView *view = [[UIImageView alloc] initWithImage:img];
+  view.contentMode = UIViewContentModeScaleAspectFit;
+  view.clipsToBounds = YES;
+  [view setBackgroundColor:[UIColor blackColor]];
+  controller.view = view;
+  
+  [self.navigationController pushViewController:controller animated:YES];
+}
+
 - (void)sendEmail
 {
   if (Field)
@@ -1276,16 +2057,31 @@
   
   NSString *address = [[[elements objectAtIndex:0] objectForKey:@"email"] objectForKey:@"address"];
   NSString *subject = [[[elements objectAtIndex:0] objectForKey:@"email"] objectForKey:@"subject"];
+
+
   
-  [functionLibrary  callMailComposerWithRecipients:[NSArray arrayWithObject:address]
-                                        andSubject:subject
-                                           andBody:text
-                                            asHTML:YES
-                                    withAttachment:nil
-                                          mimeType:@""
-                                          fileName:@""
-                                    fromController:self
-                                          showLink:_showLink];
+  UIImage *simg1 = imgView1.hidden?nil:imgView1.image;
+   UIImage *simg2 = imgView2.hidden?nil:imgView2.image;
+    UIImage *simg3 = imgView3.hidden?nil:imgView3.image;
+    UIImage *simg4 = imgView4.hidden?nil:imgView4.image;
+    UIImage *simg5 = imgView5.hidden?nil:imgView5.image;
+    UIImage *simg6 = imgView6.hidden?nil:imgView6.image;
+    UIImage *simg7 = imgView7.hidden?nil:imgView7.image;
+    UIImage *simg8 = imgView8.hidden?nil:imgView8.image;
+  
+  
+  jpgArray = [[NSArray alloc] init];
+  jpgArray = [NSArray arrayWithObjects:UIImageJPEGRepresentation(simg1, 0.9), UIImageJPEGRepresentation(simg2, 0.9),UIImageJPEGRepresentation(simg3, 0.9), UIImageJPEGRepresentation(simg4, 0.9), UIImageJPEGRepresentation(simg5, 0.9), UIImageJPEGRepresentation(simg6, 0.9), UIImageJPEGRepresentation(simg7, 0.9), UIImageJPEGRepresentation(simg8, 0.9), nil];
+
+    [functionLibrary  callMailComposerWithRecipientsMultipleAttach:[NSArray arrayWithObject:address]
+                                                        andSubject:subject
+                                                           andBody:text
+                                                            asHTML:YES
+                                                    withAttachment:jpgArray
+                                                          mimeType:@"image/jpeg"
+                                                          fileName:@"test.jpg"
+                                                    fromController:self
+                                                          showLink:_showLink];
 }
 
 #pragma mark - MFMailComposeViewControllerDelegate
@@ -1308,7 +2104,7 @@
   return YES;
 }
 
-- (NSUInteger)supportedInterfaceOrientations
+- (UIInterfaceOrientationMask)supportedInterfaceOrientations
 {
   return UIInterfaceOrientationMaskPortrait | UIInterfaceOrientationMaskPortraitUpsideDown;
 }
